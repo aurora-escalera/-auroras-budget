@@ -401,7 +401,6 @@ tfoot td{font-weight:700;font-size:11px;background:var(--bg);border-top:2px soli
   </div>
 </div>
 
-</div>
 
 <!-- HISTÓRICOS -->
 <div class="page" id="p-historicos">
@@ -1078,7 +1077,7 @@ let MONTHLY_LOG=(()=>{
   return [{month:'Mar-Abr 2026', income:60000, msiRec:17221.71, gastos:7070.96, creditoTotal:17221.71+7070.96, savings:0, cashLibre:60000-(17221.71+7070.96)}];
 })();
 // Function to "close" current month and save to log
-function closeMonth(){
+async function closeMonth(){
   const ct=MON.msiRec+MON.totalGeneral;
   const cl=MON.income-ct;
   const label=document.getElementById('period-label')?.textContent||'';
@@ -1214,7 +1213,7 @@ function pvE(i,max){
   const v=parseFloat(inp.value)||0;inp.classList.toggle('err',v>max);
   const used=_weeks.slice(_FS).reduce((s,w,j)=>(_FS+j)===i?s+v:s+(w.exp||0),0);
   const pct=Math.min(100,Math.round((used/_POOL)*100));
-  const ov=used>POOL,wa=!ov&&pct>80;
+  const ov=used>_POOL,wa=!ov&&pct>80;
   const fill=document.querySelector('.bb-f'),lbl=document.querySelector('.bb-lbl');
   if(fill){fill.style.width=pct+'%';fill.className='bb-f'+(ov?' ov':wa?' wa':'');}
   if(lbl){const rm=_POOL-used;lbl.className='bb-lbl'+(ov?' bb-ov':wa?' bb-wa':' bb-ok');lbl.textContent=ov?'⚠ +'+f(Math.abs(rm)):'Libre: '+f(rm);}
@@ -1310,18 +1309,16 @@ function rDS(){
     <div class="dsm"><div class="dsm-lbl">Net Worth</div><div class="dsm-val ${dsN(p)>=0?'p':'n'}">${f(dsN(p))}</div></div>`;
   document.getElementById('ds-pts').innerHTML=DS.periods.map((per,i)=>`<button class="ds-pb ${i===p?'active':''}" onclick="DS.active=${i};rDS()">${per}</button>`).join('');
   rDST('d');rDST('s');
-  document.getElementById('ds-nw').innerHTML=[
-    ...HIST.periods.map((per,i)=>{
-      const d=HIST.totalDebt[i]||0,s=HIST.totalSav[i]||0,nw=HIST.netWorth[i];
-      const isPeriod=HIST.periods[i]===DS.periods[p];
-      return`<tr ${isPeriod?'style="background:var(--ice)"':''}>
-        <td style="font-size:10px">${per}</td>
-        <td><span class="neg" style="font-size:11px">${d>0?f(d):'—'}</span></td>
-        <td><span class="pos" style="font-size:11px">${s>0?f(s):'—'}</span></td>
-        <td><span class="${nw!=null&&nw>=0?'nwp':'nwn'}" style="font-size:11px">${nw!=null?f(nw):'—'}</span></td>
-      </tr>`;
-    })
-  ].join('');
+  document.getElementById('ds-nw').innerHTML=DS.periods.map((per,pi)=>{
+    const d=dsD(pi),s=dsS(pi),nw=dsN(pi);
+    const hasData=d>0||s>0;
+    return`<tr ${pi===p?'style="background:var(--ice)"':''}>
+      <td style="font-size:10px">${per}${pi===p?'<span class="chip">Act.</span>':''}</td>
+      <td><span class="neg" style="font-size:11px">${d>0?f(d):'—'}</span></td>
+      <td><span class="pos" style="font-size:11px">${s>0?f(s):'—'}</span></td>
+      <td><span class="${nw>=0?'nwp':'nwn'}" style="font-size:11px">${hasData?f(nw):'—'}</span></td>
+    </tr>`;
+  }).join('');
 }
 function rDST(type){
   const rows=type==='d'?DS.debt:DS.sav;
@@ -1520,19 +1517,19 @@ function rResumen(){
 
   // Weekly full table
   const na=v=>v==null?`<span style="color:var(--dim)">—</span>`:f(v);
-  document.getElementById('res-weeks').innerHTML=WR.map((r,i)=>`<tr class="${i===CUR?'cur-row':''}">
-    <td style="font-size:11px">${r.l}${i===CUR?'<span class="chip">Hoy</span>':''}</td>
+  const wr=_weeks||[];
+  document.getElementById('res-weeks').innerHTML=wr.map((r,i)=>`<tr class="${i===_CUR?'cur-row':''}">
+    <td style="font-size:11px">${r.l}${i===_CUR?'<span class="chip">Hoy</span>':''}</td>
     <td style="font-size:11px">${na(r.bbva)}</td><td style="font-size:11px">${na(r.sl)}</td>
     <td style="font-size:11px">${na(r.sg)}</td><td style="font-size:11px">${na(r.o)}</td>
     <td><span class="amt ${r.g>0?'amb':''}">${f(r.g)}</span></td>
     <td><span class="amt pos">${f(r.rs)}</span></td>
   </tr>`).join('');
-  const sums=keys=>{const arr=WR.map(r=>r[keys]||0);return arr.reduce((s,v)=>s+v,0);};
-  document.getElementById('rf-bbva').textContent=f(WR.reduce((s,r)=>s+(r.bbva||0),0));
-  document.getElementById('rf-sl').textContent=f(WR.reduce((s,r)=>s+(r.sl||0),0));
-  document.getElementById('rf-sg').textContent=f(WR.reduce((s,r)=>s+(r.sg||0),0));
-  document.getElementById('rf-o').textContent=f(WR.reduce((s,r)=>s+(r.o||0),0));
-  document.getElementById('rf-g').textContent=f(WR.reduce((s,r)=>s+(r.g||0),0));
+  document.getElementById('rf-bbva').textContent=f(wr.reduce((s,r)=>s+(r.bbva||0),0));
+  document.getElementById('rf-sl').textContent=f(wr.reduce((s,r)=>s+(r.sl||0),0));
+  document.getElementById('rf-sg').textContent=f(wr.reduce((s,r)=>s+(r.sg||0),0));
+  document.getElementById('rf-o').textContent=f(wr.reduce((s,r)=>s+(r.o||0),0));
+  document.getElementById('rf-g').textContent=f(wr.reduce((s,r)=>s+(r.g||0),0));
 }
 
 // ═══ TABS ═══
@@ -1610,7 +1607,7 @@ function addT(){
   toast('Tipo "'+t+'" creado');
 }
 function cm(){document.getElementById('modal').classList.remove('open');_dmt='';}
-function sm(){
+async function sm(){
   if(_dmt){smDS();return;}
   const{k,tp}=_mCtx;
   const gv=id=>{const e=document.getElementById(id);return e?e.value:'';};
